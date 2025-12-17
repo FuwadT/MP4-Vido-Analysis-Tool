@@ -1,16 +1,56 @@
-# React + Vite
+# MP4 Video Analysis Tool (AI-Powered)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is an advanced, web-based tool for **automating object detection and classification** in video files. Built with **React** and **TensorFlow.js**, it brings computer vision directly into the browser, allowing for real-time analysis, tagging, and review of video content.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 🤖 smart AI Detection
+*   **Dual-Model Architecture**: Combines **COCO-SSD** for fast object localization and **MobileNet** for detailed classification.
+*   **Strict Schema Enforcement**: Automatically filters noise and categorizes objects into defined classes: `Vehicle`, `Pedestrian`, `Bus`, `Truck`, `Cyclist`, `Emergency-Vehicle`, `Golf-Cart`, `Van`, `Scooter`, and `Animal`.
+*   **Traffic Light Analysis**: Uses computer vision to detect red/green traffic light states in real-time.
 
-## React Compiler
+### 🎥 Advanced Playback & Analysis
+*   **Terminator HUD**: A high-tech "Head-Up Display" overlay visualizes the scanning process.
+*   **Analysis Cropping**: Set specific **Start** and **End** times to analyze only the relevant parts of a long video.
+*   **Pause & Resume**: Fully controllable analysis loop—pause the AI to take a break and resume exactly where you left off.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### 📊 "Session Tracks" Sidebar
+*   **Smart Analytics**: Tracks every unique object found in the video.
+*   **Search**: Find specific tracked objects by ID or Class name (e.g., "Van").
+*   **Sort & Filter**: Organize your detections by **Time Found**, **Probability Score**, or **Class**.
+*   **Click-to-Seek**: Instantly jump to the exact second an object first appeared in the video by clicking it in the list.
 
-## Expanding the ESLint configuration
+### 💾 Memory & Persistence (YAML)
+*   **Save Sessions**: Export your entire analysis session as a readable **YAML** file (`.yaml`).
+*   **Load Memory**: Upload a previous session file to instantly restore all tags and tracking data without re-processing the video.
+*   **Teach Mode**: Manually rename tags (e.g., "Vehicle #3" -> "My Car"), and the AI will remember the new label for that object throughout the video.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 🛠️ Technology Stack
+*   **Frontend**: React (Vite)
+*   **AI/ML**: TensorFlow.js, COCO-SSD, MobileNet
+*   **Styling**: Tailwind CSS, Lucide React (Icons)
+*   **Data Format**: YAML (js-yaml)
+
+## 📦 Installation & Usage
+
+1.  **Clone the repository**:
+    ```bash
+    git clone https://github.com/FuwadT/MP4-Vido-Analysis-Tool.git
+    cd MP4-Vido-Analysis-Tool
+    ```
+
+2.  **Install dependencies**:
+    ```bash
+    npm install
+    ```
+
+3.  **Run the development server**:
+    ```bash
+    npm run dev
+    ```
+
+4.  **Open in Browser**:
+    Navigate to `http://localhost:5173` (or the port shown in your terminal).
+
+## 📝 License
+This project is open-source and available under the simple tracker license.
