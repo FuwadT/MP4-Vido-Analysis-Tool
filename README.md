@@ -1,34 +1,38 @@
 # MP4 Video Analysis Tool (AI-Powered)
 
-This is an advanced, web-based tool for **automating object detection and classification** in video files. Built with **React** and **TensorFlow.js**, it brings computer vision directly into the browser, allowing for real-time analysis, tagging, and review of video content.
+**"A Computer Vision Suite for Autonomous Driving R&D"**
 
-## 🚀 Features
+![Dashboard Screenshot](public/screenshot_dashboard.png)
 
-### 🤖 smart AI Detection
-*   **Dual-Model Architecture**: Combines **COCO-SSD** for fast object localization and **MobileNet** for detailed classification.
-*   **Strict Schema Enforcement**: Automatically filters noise and categorizes objects into defined classes: `Vehicle`, `Pedestrian`, `Bus`, `Truck`, `Cyclist`, `Emergency-Vehicle`, `Golf-Cart`, `Van`, `Scooter`, and `Animal`.
-*   **Traffic Light Analysis**: Uses computer vision to detect red/green traffic light states in real-time.
+This is an advanced, web-based tool designed to emulate the **computer vision systems used in autonomous vehicles**. Born from experience directly within the **self-driving car** industry, this tool brings industrial-grade object detection, classification, and tracking algorithms directly into the browser.
 
-### 🎥 Advanced Playback & Analysis
-*   **Terminator HUD**: A high-tech "Head-Up Display" overlay visualizes the scanning process.
-*   **Analysis Cropping**: Set specific **Start** and **End** times to analyze only the relevant parts of a long video.
-*   **Pause & Resume**: Fully controllable analysis loop—pause the AI to take a break and resume exactly where you left off.
+It allows researchers and developers to visualize how an **AI driver** sees the world—detecting pedestrians, analyzing traffic lights, and tracking vehicles in real-time.
 
-### 📊 "Session Tracks" Sidebar
-*   **Smart Analytics**: Tracks every unique object found in the video.
-*   **Search**: Find specific tracked objects by ID or Class name (e.g., "Van").
-*   **Sort & Filter**: Organize your detections by **Time Found**, **Probability Score**, or **Class**.
-*   **Click-to-Seek**: Instantly jump to the exact second an object first appeared in the video by clicking it in the list.
+## 🚘 Autonomous Vehicle Features
 
-### 💾 Memory & Persistence (YAML)
-*   **Save Sessions**: Export your entire analysis session as a readable **YAML** file (`.yaml`).
-*   **Load Memory**: Upload a previous session file to instantly restore all tags and tracking data without re-processing the video.
-*   **Teach Mode**: Manually rename tags (e.g., "Vehicle #3" -> "My Car"), and the AI will remember the new label for that object throughout the video.
+### 👁️ "Robot Vision" (Smart AI Detection)
+*   **Dual-Model Architecture**: Combines **COCO-SSD** for fast object localization and **MobileNet** for detailed classification, mimicking the sensor fusion of self-driving cars.
+*   **Strict Schema Enforcement**: Adheres to a strict ontology common in AV datasets: `Vehicle`, `Pedestrian`, `Bus`, `Truck`, `Cyclist`, `Emergency-Vehicle`, `Golf-Cart`, `Van`, `Scooter`, and `Animal`.
+*   **Traffic Light Recognition**: Uses computer vision to distinguish between **Red** (Stop) and **Green** (Go) states, a critical function for Level 4/5 autonomy.
+
+### 🎥 Industrial-Grade Analysis Tools
+*   **Terminator HUD**: A high-tech "Head-Up Display" overlay visualizes the LiDAR-like scanning process.
+*   **Analysis Cropping**: Precisely analyze specific scenarios (e.g., "left turn at intersection") by cropping the analysis timeline.
+*   **Pause & Resume**: Fully controllable analysis loop, allowing for frame-by-frame inspection of corner cases.
+
+### 📊 "Session Tracks" (Object Tracking)
+*   **Object Persistence**: Just like a self-driving car tracks an obstacle over time, this tool maintains a unique ID for every object (`Track ID #42`) even as it moves across the frame.
+*   **Probability Scores**: Displays the AI's confidence levels (`98%`), crucial for safety-critical decision making.
+*   **Click-to-Seek**: Instantly jump to the moment an object was first detected—useful for reviewing "edge cases" or false positives.
+
+### 💾 Memory & Simulation (YAML)
+*   **Save Scenarios**: Export your entire analysis session as a readable **YAML** file (`.yaml`). Standard format for AV simulation scenarios.
+*   **Teach Mode**: Manually correct the AI (e.g., "Vehicle #3 is actually a Police Car"). This "human-in-the-loop" feedback is essential for training better autonomous systems.
 
 ## 🛠️ Technology Stack
 *   **Frontend**: React (Vite)
 *   **AI/ML**: TensorFlow.js, COCO-SSD, MobileNet
-*   **Styling**: Tailwind CSS, Lucide React (Icons)
+*   **Styling**: Tailwind CSS
 *   **Data Format**: YAML (js-yaml)
 
 ## 📦 Installation & Usage
@@ -50,7 +54,7 @@ This is an advanced, web-based tool for **automating object detection and classi
     ```
 
 4.  **Open in Browser**:
-    Navigate to `http://localhost:5173` (or the port shown in your terminal).
+    Navigate to `http://localhost:5173`.
 
 ## 📝 License
-This project is open-source and available under the simple tracker license.
+This project is open-source.
