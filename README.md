@@ -15,7 +15,7 @@ It allows researchers and developers to visualize how an **AI driver** sees the 
 *   **Strict Schema Enforcement**: Adheres to a strict ontology common in AV datasets: `Vehicle`, `Pedestrian`, `Bus`, `Truck`, `Cyclist`, `Emergency-Vehicle`, `Golf-Cart`, `Van`, `Scooter`, and `Animal`.
 *   **Traffic Light Recognition**: Uses computer vision to distinguish between **Red** (Stop) and **Green** (Go) states, a critical function for Level 4/5 autonomy.
 
-### 🎥 Industrial-Grade Analysis Tools
+### Industrial-Grade Analysis Tools
 *   **Terminator HUD**: A high-tech "Head-Up Display" overlay visualizes the LiDAR-like scanning process.
 *   **Analysis Cropping**: Precisely analyze specific scenarios (e.g., "left turn at intersection") by cropping the analysis timeline.
 *   **Pause & Resume**: Fully controllable analysis loop, allowing for frame-by-frame inspection of corner cases.
