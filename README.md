@@ -8,9 +8,9 @@ This is an advanced, web-based tool designed to emulate the **computer vision sy
 
 It allows researchers and developers to visualize how an **AI driver** sees the world—detecting pedestrians, analyzing traffic lights, and tracking vehicles in real-time.
 
-## 🚘 Autonomous Vehicle Features
+## Autonomous Vehicle Features
 
-### 👁️ "Robot Vision" (Smart AI Detection)
+### "Robot Vision" 
 *   **Dual-Model Architecture**: Combines **COCO-SSD** for fast object localization and **MobileNet** for detailed classification, mimicking the sensor fusion of self-driving cars.
 *   **Strict Schema Enforcement**: Adheres to a strict ontology common in AV datasets: `Vehicle`, `Pedestrian`, `Bus`, `Truck`, `Cyclist`, `Emergency-Vehicle`, `Golf-Cart`, `Van`, `Scooter`, and `Animal`.
 *   **Traffic Light Recognition**: Uses computer vision to distinguish between **Red** (Stop) and **Green** (Go) states, a critical function for Level 4/5 autonomy.
@@ -20,22 +20,22 @@ It allows researchers and developers to visualize how an **AI driver** sees the 
 *   **Analysis Cropping**: Precisely analyze specific scenarios (e.g., "left turn at intersection") by cropping the analysis timeline.
 *   **Pause & Resume**: Fully controllable analysis loop, allowing for frame-by-frame inspection of corner cases.
 
-### 📊 "Session Tracks" (Object Tracking)
+### "Session Tracks" (Object Tracking)
 *   **Object Persistence**: Just like a self-driving car tracks an obstacle over time, this tool maintains a unique ID for every object (`Track ID #42`) even as it moves across the frame.
 *   **Probability Scores**: Displays the AI's confidence levels (`98%`), crucial for safety-critical decision making.
 *   **Click-to-Seek**: Instantly jump to the moment an object was first detected—useful for reviewing "edge cases" or false positives.
 
-### 💾 Memory & Simulation (YAML)
+### Memory & Simulation (YAML or JSON)
 *   **Save Scenarios**: Export your entire analysis session as a readable **YAML** file (`.yaml`). Standard format for AV simulation scenarios.
 *   **Teach Mode**: Manually correct the AI (e.g., "Vehicle #3 is actually a Police Car"). This "human-in-the-loop" feedback is essential for training better autonomous systems.
 
-## 🛠️ Technology Stack
+## Technology Stack
 *   **Frontend**: React (Vite)
 *   **AI/ML**: TensorFlow.js, COCO-SSD, MobileNet
 *   **Styling**: Tailwind CSS
 *   **Data Format**: YAML (js-yaml)
 
-## 📦 Installation & Usage
+## Installation & Usage
 
 1.  **Clone the repository**:
     ```bash
@@ -54,7 +54,7 @@ It allows researchers and developers to visualize how an **AI driver** sees the 
     ```
 
 4.  **Open in Browser**:
-    Navigate to `http://localhost:5173`.
+    
 
-## 📝 License
+## License
 This project is open-source.
