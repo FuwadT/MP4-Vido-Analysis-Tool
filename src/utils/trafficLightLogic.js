@@ -36,8 +36,6 @@ export function analyzeTrafficLightColor(video, bbox) {
     let yellowScore = 0;
     let greenScore = 0;
 
-    const totalPixels = data.length / 4;
-
     // Heuristic: Count pixels that are "significantly" one color
     for (let i = 0; i < data.length; i += 4) {
         const r = data[i];

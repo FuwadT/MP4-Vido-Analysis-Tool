@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { CanvasOverlay } from './CanvasOverlay';
 import { Controls } from './Controls';
 import { IncidentTimeline } from './IncidentTimeline';
@@ -7,7 +7,6 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { SimpleTracker } from '../utils/tracker';
-import { analyzeTrafficLightColor } from '../utils/trafficLightLogic';
 import { loadClassifier, getDetailedClass } from '../utils/detailClassifier';
 import { mapCocoToSchema, refineSchemaTag } from '../utils/schemaMapper';
 import { TrackSidebar } from './TrackSidebar';
@@ -73,7 +72,7 @@ export function VideoAnnotation() {
             setIsModelLoading(true);
             try {
                 await tf.ready();
-                const [loadedCoco, loadedMobile] = await Promise.all([
+                const [loadedCoco] = await Promise.all([
                     cocoSsd.load(),
                     loadClassifier()
                 ]);
@@ -121,7 +120,7 @@ export function VideoAnnotation() {
         }
     };
 
-    const runFullAnalysis = async () => {
+    const runFullAnalysis = useCallback(async () => {
         if (!videoRef.current || !model) return;
 
         setAnalysisMode('analyzing');
@@ -254,7 +253,7 @@ export function VideoAnnotation() {
         setAnalysisMode('done');
         setAnalysisProgress(100);
         video.currentTime = startTime; // Reset to start
-    };
+    }, [model, analysisStart, analysisEnd, minConfidence]);
 
     const handleLoadedMetadata = () => {
         if (videoRef.current) {
@@ -262,7 +261,7 @@ export function VideoAnnotation() {
         }
     };
 
-    const togglePlay = () => {
+    const togglePlay = useCallback(() => {
         if (videoRef.current) {
             if (isPlaying) {
                 videoRef.current.pause();
@@ -271,28 +270,28 @@ export function VideoAnnotation() {
             }
             setIsPlaying(!isPlaying);
         }
-    };
+    }, [isPlaying]);
 
     // Event Management
-    const handleAddEvent = (event) => {
+    const handleAddEvent = useCallback((event) => {
         setEvents(prev => [...prev, event]);
-    };
+    }, []);
 
-    const handleRemoveEvent = (eventId) => {
+    const handleRemoveEvent = useCallback((eventId) => {
         setEvents(prev => prev.filter(e => e.id !== eventId));
-    };
+    }, []);
 
-    const handleUpdateEvent = (eventId, updates) => {
+    const handleUpdateEvent = useCallback((eventId, updates) => {
         setEvents(prev => prev.map(e => e.id === eventId ? { ...e, ...updates } : e));
-    };
+    }, []);
 
     // Playback Speed Control
-    const handlePlaybackSpeedChange = (speed) => {
+    const handlePlaybackSpeedChange = useCallback((speed) => {
         setPlaybackSpeed(speed);
         if (videoRef.current) {
             videoRef.current.playbackRate = speed;
         }
-    };
+    }, []);
 
     // Keyboard Shortcuts Handler
     useEffect(() => {
@@ -353,15 +352,19 @@ export function VideoAnnotation() {
                 case '+': // Increase speed
                 case '=': // Also handle = key (same key as +)
                     preventDefault();
-                    const newSpeedUp = Math.min(playbackSpeed * 1.25, 2);
-                    handlePlaybackSpeedChange(newSpeedUp);
+                    {
+                        const newSpeedUp = Math.min(playbackSpeed * 1.25, 2);
+                        handlePlaybackSpeedChange(newSpeedUp);
+                    }
                     break;
 
                 case '-': // Decrease speed
                 case '_': // Also handle _ key (same key as -)
                     preventDefault();
-                    const newSpeedDown = Math.max(playbackSpeed * 0.8, 0.25);
-                    handlePlaybackSpeedChange(newSpeedDown);
+                    {
+                        const newSpeedDown = Math.max(playbackSpeed * 0.8, 0.25);
+                        handlePlaybackSpeedChange(newSpeedDown);
+                    }
                     break;
 
                 case '0': // Reset to 1x speed
@@ -383,27 +386,29 @@ export function VideoAnnotation() {
                 case '5': // Quick add: Pedestrian
                 case '6': // Quick add: System Event
                 case '7': // Quick add: Custom
-                    preventDefault();
-                    const eventTypes = ['COLLISION', 'NEAR_MISS', 'HARD_BRAKE', 'DETECTION', 'PEDESTRIAN', 'SYSTEM_EVENT', 'CUSTOM'];
-                    const typeIndex = parseInt(e.key) - 1;
-                    if (typeIndex >= 0 && typeIndex < eventTypes.length) {
-                        const eventType = eventTypes[typeIndex];
-                        const EVENT_LABELS = {
-                            COLLISION: 'Collision',
-                            NEAR_MISS: 'Near Miss',
-                            HARD_BRAKE: 'Hard Brake',
-                            DETECTION: 'Object Detection',
-                            PEDESTRIAN: 'Pedestrian',
-                            SYSTEM_EVENT: 'System Event',
-                            CUSTOM: 'Custom'
-                        };
-                        handleAddEvent({
-                            id: Date.now(),
-                            type: eventType,
-                            time: currentTime,
-                            note: EVENT_LABELS[eventType],
-                            severity: eventType === 'COLLISION' ? 'critical' : eventType === 'NEAR_MISS' || eventType === 'HARD_BRAKE' || eventType === 'PEDESTRIAN' ? 'warning' : 'info'
-                        });
+                    {
+                        preventDefault();
+                        const eventTypes = ['COLLISION', 'NEAR_MISS', 'HARD_BRAKE', 'DETECTION', 'PEDESTRIAN', 'SYSTEM_EVENT', 'CUSTOM'];
+                        const typeIndex = parseInt(e.key) - 1;
+                        if (typeIndex >= 0 && typeIndex < eventTypes.length) {
+                            const eventType = eventTypes[typeIndex];
+                            const EVENT_LABELS = {
+                                COLLISION: 'Collision',
+                                NEAR_MISS: 'Near Miss',
+                                HARD_BRAKE: 'Hard Brake',
+                                DETECTION: 'Object Detection',
+                                PEDESTRIAN: 'Pedestrian',
+                                SYSTEM_EVENT: 'System Event',
+                                CUSTOM: 'Custom'
+                            };
+                            handleAddEvent({
+                                id: Date.now(),
+                                type: eventType,
+                                time: currentTime,
+                                note: EVENT_LABELS[eventType],
+                                severity: eventType === 'COLLISION' ? 'critical' : eventType === 'NEAR_MISS' || eventType === 'HARD_BRAKE' || eventType === 'PEDESTRIAN' ? 'warning' : 'info'
+                            });
+                        }
                     }
                     break;
 
@@ -435,7 +440,7 @@ export function VideoAnnotation() {
 
         window.addEventListener('keydown', handleKeyPress);
         return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [currentTime, duration, isPlaying, playbackSpeed, events, metadata]);
+    }, [currentTime, duration, isPlaying, playbackSpeed, events, metadata, handleAddEvent, handleExportReport, handleMetadataSave, handleSeek, togglePlay, handlePlaybackSpeedChange]);
 
     // Apply playback speed when video loads
     useEffect(() => {
@@ -445,15 +450,15 @@ export function VideoAnnotation() {
     }, [videoSrc, playbackSpeed]);
 
     // Metadata Management
-    const handleMetadataUpdate = (updatedMetadata) => {
+    const handleMetadataUpdate = useCallback((updatedMetadata) => {
         setMetadata(updatedMetadata);
-    };
+    }, []);
 
-    const handleMetadataSave = (metadataToSave) => {
+    const handleMetadataSave = useCallback((metadataToSave) => {
         setMetadata(metadataToSave);
         // Could also trigger auto-save to localStorage or backend here
         console.log('Metadata saved:', metadataToSave);
-    };
+    }, []);
 
     // Auto-save effect
     useEffect(() => {
@@ -478,7 +483,7 @@ export function VideoAnnotation() {
         return () => clearInterval(autoSaveInterval);
     }, [metadata, events]);
 
-    const handleExportReport = () => {
+    const handleExportReport = useCallback(() => {
         // Generate comprehensive incident report
         const report = {
             metadata,
@@ -505,15 +510,16 @@ export function VideoAnnotation() {
             console.error('Failed to export report:', e);
             alert('Failed to export report');
         }
-    };
+    }, [metadata, events, uniqueTracks, analysisResults, analysisStart, analysisEnd, duration]);
 
-    const handleSeek = (time) => {
+    const handleSeek = useCallback((time) => {
         if (videoRef.current) {
             videoRef.current.currentTime = time;
             setCurrentTime(time);
 
             if (analysisMode === 'done') {
                 // Look up frame
+                // Note: analysisResults dependency might make this change often if analysis updates
                 const frame = analysisResults.find(f => Math.abs(f.timestamp - time) < 0.2);
                 if (frame) {
                     setPredictions(frame.predictions);
@@ -523,10 +529,10 @@ export function VideoAnnotation() {
                 trackerRef.current.reset();
             }
         }
-    };
+    }, [analysisMode, analysisResults]);
 
     // Live Detection Loop (Hybrid: Only run if NOT analyzed)
-    const detectFrame = async () => {
+    const detectFrame = useCallback(async () => {
         if (analysisMode === 'analyzing' || analysisMode === 'done') return; // Disable live if analyzing or done
 
         if (videoRef.current && model && videoRef.current.readyState === 4) {
@@ -567,7 +573,7 @@ export function VideoAnnotation() {
         if (isPlaying) {
             requestRef.current = requestAnimationFrame(detectFrame);
         }
-    };
+    }, [analysisMode, model, minConfidence, isPlaying]);
 
     // --- Persistence (Memory) ---
     const saveAnalysis = () => {
@@ -653,7 +659,7 @@ export function VideoAnnotation() {
     };
 
     // --- Teaching (Learning) ---
-    const renameTrack = (trackId, currentLabel) => {
+    const renameTrack = useCallback((trackId, currentLabel) => {
         const newLabel = prompt(`Teach AI: Rename '${currentLabel}' (ID #${trackId}) to:`, currentLabel);
         if (!newLabel || newLabel === currentLabel) return;
 
@@ -678,7 +684,7 @@ export function VideoAnnotation() {
         setPredictions(prev => prev.map(p =>
             p.id === trackId ? { ...p, class: newLabel } : p
         ));
-    };
+    }, [analysisResults]);
 
     // --- State Management for Detection ---
     // Trigger detection (Live)
@@ -697,7 +703,7 @@ export function VideoAnnotation() {
         return () => {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
         };
-    }, [isPlaying, minConfidence, model, analysisMode]); // Re-run if model loads while playing
+    }, [isPlaying, minConfidence, model, analysisMode, detectFrame]); // Re-run if model loads while playing
 
     // Also run once when video is paused but we might be seeking or just loaded
     // To show tags on the current static frame.
@@ -707,7 +713,7 @@ export function VideoAnnotation() {
             const timer = setTimeout(() => detectFrame(), 200);
             return () => clearTimeout(timer);
         }
-    }, [currentTime, model, isPlaying, analysisMode]);
+    }, [currentTime, model, isPlaying, analysisMode, detectFrame]);
 
     // Force update unique tags if threshold rises above existing logs?
     // Ideally we would store all raw detections and filter 'uniqueTags' on the fly too, but that's expensive memory-wise.
@@ -905,7 +911,6 @@ export function VideoAnnotation() {
                 tracks={uniqueTracks}
                 onRename={(track) => renameTrack(track.id, track.class)}
                 onSeek={handleSeek}
-                currentTime={currentTime}
                 metadata={metadata}
                 onMetadataUpdate={handleMetadataUpdate}
                 onMetadataSave={handleMetadataSave}

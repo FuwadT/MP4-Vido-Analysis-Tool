@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import {
     Car,
     MapPin,
@@ -21,7 +21,6 @@ import {
     validateSpeed,
     validateAcceleration,
     validateSteeringAngle,
-    REQUIRED_FIELDS,
     validateRequiredFields
 } from '../utils/validation';
 
@@ -69,7 +68,7 @@ const AUTOPILOT_MODES = [
     'Driver Override'
 ];
 
-export function MetadataPanel({
+export const MetadataPanel = memo(function MetadataPanel({
     metadata = {},
     onUpdate,
     onSave,
@@ -187,11 +186,13 @@ export function MetadataPanel({
                 <div className="flex items-center gap-3">
                     <button
                         onClick={() => setIsExpanded(!isExpanded)}
+                        aria-expanded={isExpanded}
+                        aria-label={isExpanded ? "Collapse metadata panel" : "Expand metadata panel"}
                         className="p-1 hover:bg-gray-700 rounded transition-colors"
                     >
-                        {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                        {isExpanded ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
                     </button>
-                    <FileText size={18} className="text-blue-400" />
+                    <FileText size={18} className="text-blue-400" aria-hidden="true" />
                     <h3 className="text-sm font-bold text-white uppercase tracking-wider">
                         Incident Metadata
                     </h3>
@@ -202,17 +203,19 @@ export function MetadataPanel({
                     {onExportReport && (
                         <button
                             onClick={onExportReport}
+                            aria-label="Export report"
                             className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-xs text-white transition-colors flex items-center gap-1"
                         >
-                            <FileText size={14} />
+                            <FileText size={14} aria-hidden="true" />
                             Export Report
                         </button>
                     )}
                     <button
                         onClick={handleSave}
+                        aria-label="Save metadata"
                         className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs text-white transition-colors flex items-center gap-1"
                     >
-                        <Save size={14} />
+                        <Save size={14} aria-hidden="true" />
                         Save
                     </button>
                 </div>
@@ -223,14 +226,15 @@ export function MetadataPanel({
                     {/* Incident Classification */}
                     <div className="space-y-3">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <AlertTriangle size={14} />
+                            <AlertTriangle size={14} aria-hidden="true" />
                             Incident Classification
                         </h4>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Incident Type</label>
+                                <label htmlFor="incidentType" className="text-xs text-gray-400 block mb-1">Incident Type</label>
                                 <select
+                                    id="incidentType"
                                     value={localMetadata.incidentType}
                                     onChange={(e) => handleChange('incidentType', e.target.value)}
                                     className="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white"
@@ -243,20 +247,25 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">
+                                <label htmlFor="severity" className="text-xs text-gray-400 block mb-1">
                                     Severity: <span className={`font-bold ${getSeverityColor(localMetadata.severity)}`}>
                                         {getSeverityLabel(localMetadata.severity)}
                                     </span>
                                 </label>
                                 <input
+                                    id="severity"
                                     type="range"
                                     min="1"
                                     max="5"
+                                    aria-valuemin="1"
+                                    aria-valuemax="5"
+                                    aria-valuenow={localMetadata.severity}
+                                    aria-valuetext={getSeverityLabel(localMetadata.severity)}
                                     value={localMetadata.severity}
                                     onChange={(e) => handleChange('severity', parseInt(e.target.value))}
                                     className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                 />
-                                <div className="flex justify-between text-xs text-gray-500 mt-1">
+                                <div className="flex justify-between text-xs text-gray-500 mt-1" aria-hidden="true">
                                     <span>1</span>
                                     <span>2</span>
                                     <span>3</span>
@@ -267,8 +276,9 @@ export function MetadataPanel({
                         </div>
 
                         <div>
-                            <label className="text-xs text-gray-400 block mb-1">Description</label>
+                            <label htmlFor="description" className="text-xs text-gray-400 block mb-1">Description</label>
                             <textarea
+                                id="description"
                                 value={localMetadata.description}
                                 onChange={(e) => handleChange('description', e.target.value)}
                                 placeholder="Describe what happened..."
@@ -281,14 +291,15 @@ export function MetadataPanel({
                     {/* Vehicle Telemetry */}
                     <div className="space-y-3 border-t border-gray-700 pt-4">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <Gauge size={14} />
+                            <Gauge size={14} aria-hidden="true" />
                             Vehicle Telemetry
                         </h4>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Speed (mph)</label>
+                                <label htmlFor="speed" className="text-xs text-gray-400 block mb-1">Speed (mph)</label>
                                 <input
+                                    id="speed"
                                     type="number"
                                     value={localMetadata.speed}
                                     onChange={(e) => handleChange('speed', e.target.value)}
@@ -298,8 +309,9 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Acceleration (m/s²)</label>
+                                <label htmlFor="acceleration" className="text-xs text-gray-400 block mb-1">Acceleration (m/s²)</label>
                                 <input
+                                    id="acceleration"
                                     type="number"
                                     value={localMetadata.acceleration}
                                     onChange={(e) => handleChange('acceleration', e.target.value)}
@@ -309,8 +321,9 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Steering Angle (°)</label>
+                                <label htmlFor="steeringAngle" className="text-xs text-gray-400 block mb-1">Steering Angle (°)</label>
                                 <input
+                                    id="steeringAngle"
                                     type="number"
                                     value={localMetadata.steeringAngle}
                                     onChange={(e) => handleChange('steeringAngle', e.target.value)}
@@ -320,8 +333,9 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Brake Status</label>
+                                <label htmlFor="brakeStatus" className="text-xs text-gray-400 block mb-1">Brake Status</label>
                                 <input
+                                    id="brakeStatus"
                                     type="text"
                                     value={localMetadata.brakeStatus}
                                     onChange={(e) => handleChange('brakeStatus', e.target.value)}
@@ -335,21 +349,25 @@ export function MetadataPanel({
                     {/* Environmental Conditions */}
                     <div className="space-y-3 border-t border-gray-700 pt-4">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <Cloud size={14} />
+                            <Cloud size={14} aria-hidden="true" />
                             Environmental Conditions
                         </h4>
 
-                        <div className="grid grid-cols-3 gap-2">
-                            {WEATHER_CONDITIONS.map(({ value, label, icon: Icon }) => (
+                        <div role="radiogroup" aria-label="Weather Condition" className="grid grid-cols-3 gap-2">
+                            {/* eslint-disable-next-line no-unused-vars */}
+                            {WEATHER_CONDITIONS.map(({ value, label, icon: WeatherIcon }) => (
                                 <button
                                     key={value}
+                                    role="radio"
+                                    aria-checked={localMetadata.weather === value}
+                                    aria-label={label}
                                     onClick={() => handleChange('weather', value)}
                                     className={`p-2 rounded border transition-colors flex flex-col items-center gap-1 ${localMetadata.weather === value
                                         ? 'bg-blue-600 border-blue-500 text-white'
                                         : 'bg-gray-900 border-gray-700 text-gray-400 hover:bg-gray-800'
                                         }`}
                                 >
-                                    <Icon size={16} />
+                                    <WeatherIcon size={16} aria-hidden="true" />
                                     <span className="text-xs">{label}</span>
                                 </button>
                             ))}
@@ -357,8 +375,9 @@ export function MetadataPanel({
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Lighting</label>
+                                <label htmlFor="lighting" className="text-xs text-gray-400 block mb-1">Lighting</label>
                                 <select
+                                    id="lighting"
                                     value={localMetadata.lighting}
                                     onChange={(e) => handleChange('lighting', e.target.value)}
                                     className="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white"
@@ -370,8 +389,9 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Road Condition</label>
+                                <label htmlFor="roadCondition" className="text-xs text-gray-400 block mb-1">Road Condition</label>
                                 <select
+                                    id="roadCondition"
                                     value={localMetadata.roadCondition}
                                     onChange={(e) => handleChange('roadCondition', e.target.value)}
                                     className="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white"
@@ -387,14 +407,15 @@ export function MetadataPanel({
                     {/* Location Data */}
                     <div className="space-y-3 border-t border-gray-700 pt-4">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <MapPin size={14} />
+                            <MapPin size={14} aria-hidden="true" />
                             Location Data
                         </h4>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">GPS Coordinates</label>
+                                <label htmlFor="gpsCoordinates" className="text-xs text-gray-400 block mb-1">GPS Coordinates</label>
                                 <input
+                                    id="gpsCoordinates"
                                     type="text"
                                     value={localMetadata.gpsCoordinates}
                                     onChange={(e) => handleChange('gpsCoordinates', e.target.value)}
@@ -404,8 +425,9 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Street Name</label>
+                                <label htmlFor="streetName" className="text-xs text-gray-400 block mb-1">Street Name</label>
                                 <input
+                                    id="streetName"
                                     type="text"
                                     value={localMetadata.streetName}
                                     onChange={(e) => handleChange('streetName', e.target.value)}
@@ -415,8 +437,9 @@ export function MetadataPanel({
                             </div>
 
                             <div className="col-span-2">
-                                <label className="text-xs text-gray-400 block mb-1">Intersection Type</label>
+                                <label htmlFor="intersectionType" className="text-xs text-gray-400 block mb-1">Intersection Type</label>
                                 <input
+                                    id="intersectionType"
                                     type="text"
                                     value={localMetadata.intersectionType}
                                     onChange={(e) => handleChange('intersectionType', e.target.value)}
@@ -430,14 +453,15 @@ export function MetadataPanel({
                     {/* System State */}
                     <div className="space-y-3 border-t border-gray-700 pt-4">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <Car size={14} />
+                            <Car size={14} aria-hidden="true" />
                             System State
                         </h4>
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Autopilot Mode</label>
+                                <label htmlFor="autopilotMode" className="text-xs text-gray-400 block mb-1">Autopilot Mode</label>
                                 <select
+                                    id="autopilotMode"
                                     value={localMetadata.autopilotMode}
                                     onChange={(e) => handleChange('autopilotMode', e.target.value)}
                                     className="w-full px-2 py-1.5 bg-gray-900 border border-gray-700 rounded text-sm text-white"
@@ -450,8 +474,9 @@ export function MetadataPanel({
                             </div>
 
                             <div>
-                                <label className="text-xs text-gray-400 block mb-1">Sensor Status</label>
+                                <label htmlFor="sensorStatus" className="text-xs text-gray-400 block mb-1">Sensor Status</label>
                                 <input
+                                    id="sensorStatus"
                                     type="text"
                                     value={localMetadata.sensorStatus}
                                     onChange={(e) => handleChange('sensorStatus', e.target.value)}
@@ -477,13 +502,14 @@ export function MetadataPanel({
                     {/* Root Cause Analysis */}
                     <div className="space-y-3 border-t border-gray-700 pt-4">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-                            <Activity size={14} />
+                            <Activity size={14} aria-hidden="true" />
                             Root Cause Analysis
                         </h4>
 
                         <div>
-                            <label className="text-xs text-gray-400 block mb-1">Root Cause</label>
+                            <label htmlFor="rootCause" className="text-xs text-gray-400 block mb-1">Root Cause</label>
                             <textarea
+                                id="rootCause"
                                 value={localMetadata.rootCause}
                                 onChange={(e) => handleChange('rootCause', e.target.value)}
                                 placeholder="Primary cause of the incident..."
@@ -493,8 +519,9 @@ export function MetadataPanel({
                         </div>
 
                         <div>
-                            <label className="text-xs text-gray-400 block mb-1">Contributing Factors</label>
+                            <label htmlFor="contributingFactors" className="text-xs text-gray-400 block mb-1">Contributing Factors</label>
                             <textarea
+                                id="contributingFactors"
                                 value={localMetadata.contributingFactors}
                                 onChange={(e) => handleChange('contributingFactors', e.target.value)}
                                 placeholder="Other factors that contributed..."
@@ -504,8 +531,9 @@ export function MetadataPanel({
                         </div>
 
                         <div>
-                            <label className="text-xs text-gray-400 block mb-1">Recommendations</label>
+                            <label htmlFor="recommendations" className="text-xs text-gray-400 block mb-1">Recommendations</label>
                             <textarea
+                                id="recommendations"
                                 value={localMetadata.recommendations}
                                 onChange={(e) => handleChange('recommendations', e.target.value)}
                                 placeholder="Recommendations to prevent recurrence..."
@@ -518,4 +546,4 @@ export function MetadataPanel({
             )}
         </div>
     );
-}
+});

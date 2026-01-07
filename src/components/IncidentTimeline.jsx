@@ -1,11 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { 
-  AlertTriangle, 
-  AlertCircle, 
-  Info, 
-  Zap, 
-  Car, 
-  Users, 
+import React, { useState, useRef, memo } from 'react';
+import {
+  AlertTriangle,
+  AlertCircle,
+  Info,
+  Zap,
+  Car,
+  Users,
   StopCircle,
   ChevronDown,
   ChevronUp,
@@ -23,15 +23,13 @@ const EVENT_TYPES = {
   CUSTOM: { label: 'Custom', icon: Info, color: 'bg-gray-500', severity: 'info' }
 };
 
-export function IncidentTimeline({ 
-  currentTime, 
-  duration, 
-  onSeek, 
+export const IncidentTimeline = memo(function IncidentTimeline({
+  currentTime,
+  duration,
+  onSeek,
   events = [],
   onAddEvent,
   onRemoveEvent,
-  onUpdateEvent,
-  tracks = [],
   playbackSpeed = 1,
   onPlaybackSpeedChange
 }) {
@@ -111,9 +109,11 @@ export function IncidentTimeline({
         <div className="flex items-center gap-3">
           <button
             onClick={() => setIsExpanded(!isExpanded)}
+            aria-expanded={isExpanded}
+            aria-label={isExpanded ? "Collapse timeline" : "Expand timeline"}
             className="p-1 hover:bg-gray-700 rounded transition-colors"
           >
-            {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            {isExpanded ? <ChevronUp size={18} aria-hidden="true" /> : <ChevronDown size={18} aria-hidden="true" />}
           </button>
           <h3 className="text-sm font-bold text-white uppercase tracking-wider">
             Incident Timeline
@@ -125,17 +125,18 @@ export function IncidentTimeline({
 
         <div className="flex items-center gap-2">
           {/* Playback Speed Control */}
-          <div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded">
+          <div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded" role="group" aria-label="Playback Speed">
             <span className="text-xs text-gray-400">Speed:</span>
             {[0.25, 0.5, 1, 2].map(speed => (
               <button
                 key={speed}
+                aria-label={`Set speed to ${speed}x`}
+                aria-pressed={playbackSpeed === speed}
                 onClick={() => onPlaybackSpeedChange && onPlaybackSpeedChange(speed)}
-                className={`px-2 py-1 text-xs rounded transition-colors ${
-                  playbackSpeed === speed
-                    ? 'bg-blue-600 text-white'
-                    : 'text-gray-400 hover:bg-gray-700'
-                }`}
+                className={`px-2 py-1 text-xs rounded transition-colors ${playbackSpeed === speed
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-400 hover:bg-gray-700'
+                  }`}
               >
                 {speed}x
               </button>
@@ -145,10 +146,12 @@ export function IncidentTimeline({
           {/* Add Event Button */}
           <button
             onClick={() => setShowAddEvent(!showAddEvent)}
+            aria-label="Add event marker"
+            aria-expanded={showAddEvent}
             className="p-1.5 bg-blue-600 hover:bg-blue-700 rounded transition-colors"
             title="Add event marker"
           >
-            <Plus size={16} />
+            <Plus size={16} aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -162,6 +165,7 @@ export function IncidentTimeline({
                 <select
                   value={newEventType}
                   onChange={(e) => setNewEventType(e.target.value)}
+                  aria-label="Event Type"
                   className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-white"
                 >
                   {Object.entries(EVENT_TYPES).map(([key, type]) => (
@@ -173,6 +177,7 @@ export function IncidentTimeline({
                   value={newEventNote}
                   onChange={(e) => setNewEventNote(e.target.value)}
                   placeholder="Event note (optional)"
+                  aria-label="Event Note"
                   className="flex-1 px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm text-white placeholder-gray-500"
                 />
                 <button
@@ -183,40 +188,41 @@ export function IncidentTimeline({
                 </button>
                 <button
                   onClick={() => setShowAddEvent(false)}
+                  aria-label="Close add event"
                   className="p-1 hover:bg-gray-700 rounded transition-colors"
                 >
-                  <X size={16} />
+                  <X size={16} aria-hidden="true" />
                 </button>
               </div>
             </div>
           )}
 
           {/* Quick Jump Buttons */}
-          <div className="p-3 bg-gray-750 border-b border-gray-700 flex gap-2 flex-wrap">
+          <div className="p-3 bg-gray-750 border-b border-gray-700 flex gap-2 flex-wrap" role="group" aria-label="Quick Jump">
             <button
               onClick={jumpToPrevEvent}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!events.some(e => e.time < currentTime - 0.1)}
             >
               ← Previous Event
             </button>
             <button
               onClick={jumpToNextEvent}
-              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors"
+              className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!events.some(e => e.time > currentTime + 0.1)}
             >
               Next Event →
             </button>
             <button
               onClick={jumpToFirstDetection}
-              className="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-xs text-white transition-colors"
+              className="px-3 py-1 bg-blue-700 hover:bg-blue-600 rounded text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!events.some(e => e.type === 'DETECTION')}
             >
               First Detection
             </button>
             <button
               onClick={jumpToClosestApproach}
-              className="px-3 py-1 bg-orange-700 hover:bg-orange-600 rounded text-xs text-white transition-colors"
+              className="px-3 py-1 bg-orange-700 hover:bg-orange-600 rounded text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!events.some(e => e.severity === 'critical' || e.severity === 'warning')}
             >
               Critical Moment
@@ -224,10 +230,10 @@ export function IncidentTimeline({
           </div>
 
           {/* Timeline Visualization */}
-          <div className="p-4">
+          <div className="p-4" aria-label="Event Timeline">
             <div className="relative">
               {/* Time labels */}
-              <div className="flex justify-between text-xs text-gray-400 mb-2">
+              <div className="flex justify-between text-xs text-gray-400 mb-2" aria-hidden="true">
                 <span>0:00</span>
                 <span>{formatTime(duration / 2)}</span>
                 <span>{formatTime(duration)}</span>
@@ -237,7 +243,18 @@ export function IncidentTimeline({
               <div
                 ref={timelineRef}
                 onClick={handleTimelineClick}
-                className="relative h-12 bg-gray-700 rounded-lg cursor-pointer overflow-visible"
+                role="slider"
+                aria-label="Timeline Scrubber"
+                aria-valuemin="0"
+                aria-valuemax={duration}
+                aria-valuenow={currentTime}
+                aria-valuetext={formatTime(currentTime)}
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'ArrowRight') onSeek(Math.min(currentTime + 5, duration));
+                  if (e.key === 'ArrowLeft') onSeek(Math.max(currentTime - 5, 0));
+                }}
+                className="relative h-12 bg-gray-700 rounded-lg cursor-pointer overflow-visible focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 {/* Progress bar */}
                 <div
@@ -249,7 +266,7 @@ export function IncidentTimeline({
                 {events.map((event) => {
                   const EventIcon = EVENT_TYPES[event.type]?.icon || Info;
                   const eventColor = EVENT_TYPES[event.type]?.color || 'bg-gray-500';
-                  
+
                   return (
                     <div
                       key={event.id}
@@ -257,10 +274,17 @@ export function IncidentTimeline({
                       style={{ left: `${getPositionPercent(event.time)}%` }}
                     >
                       <div className="relative group">
-                        <div className={`${eventColor} p-1.5 rounded-full shadow-lg border-2 border-gray-800 cursor-pointer hover:scale-110 transition-transform`}>
-                          <EventIcon size={14} className="text-white" />
-                        </div>
-                        
+                        <button
+                          aria-label={`${event.note} at ${formatTime(event.time)}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSeek(event.time);
+                          }}
+                          className={`${eventColor} p-1.5 rounded-full shadow-lg border-2 border-gray-800 cursor-pointer hover:scale-110 transition-transform`}
+                        >
+                          <EventIcon size={14} className="text-white" aria-hidden="true" />
+                        </button>
+
                         {/* Tooltip */}
                         <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block z-10">
                           <div className="bg-gray-900 text-white text-xs rounded px-2 py-1 whitespace-nowrap shadow-xl border border-gray-700">
@@ -286,8 +310,9 @@ export function IncidentTimeline({
 
                 {/* Current time indicator */}
                 <div
-                  className="absolute top-0 h-full w-0.5 bg-white shadow-lg"
+                  className="absolute top-0 h-full w-0.5 bg-white shadow-lg pointer-events-none"
                   style={{ left: `${getPositionPercent(currentTime)}%` }}
+                  aria-hidden="true"
                 >
                   <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1 w-3 h-3 bg-white rounded-full border-2 border-gray-800" />
                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1 w-3 h-3 bg-white rounded-full border-2 border-gray-800" />
@@ -295,7 +320,7 @@ export function IncidentTimeline({
               </div>
 
               {/* Time ticks */}
-              <div className="relative h-2 mt-1">
+              <div className="relative h-2 mt-1" aria-hidden="true">
                 {Array.from({ length: 11 }).map((_, i) => (
                   <div
                     key={i}
@@ -309,7 +334,7 @@ export function IncidentTimeline({
 
           {/* Event List */}
           {events.length > 0 && (
-            <div className="p-3 bg-gray-750 border-t border-gray-700 max-h-40 overflow-y-auto">
+            <div className="p-3 bg-gray-750 border-t border-gray-700 max-h-40 overflow-y-auto" role="list" aria-label="Event List">
               <div className="text-xs text-gray-400 uppercase font-bold mb-2">Events</div>
               <div className="space-y-1">
                 {events
@@ -317,15 +342,22 @@ export function IncidentTimeline({
                   .map((event) => {
                     const EventIcon = EVENT_TYPES[event.type]?.icon || Info;
                     const eventColor = EVENT_TYPES[event.type]?.color || 'bg-gray-500';
-                    
+
                     return (
                       <div
                         key={event.id}
+                        role="listitem"
                         onClick={() => onSeek(event.time)}
-                        className="flex items-center gap-2 p-2 bg-gray-800 hover:bg-gray-700 rounded cursor-pointer transition-colors"
+                        className="flex items-center gap-2 p-2 bg-gray-800 hover:bg-gray-700 rounded cursor-pointer transition-colors group"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            onSeek(event.time);
+                          }
+                        }}
                       >
                         <div className={`${eventColor} p-1 rounded`}>
-                          <EventIcon size={12} className="text-white" />
+                          <EventIcon size={12} className="text-white" aria-hidden="true" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="text-xs text-white truncate">{event.note}</div>
@@ -333,13 +365,14 @@ export function IncidentTimeline({
                         </div>
                         {onRemoveEvent && (
                           <button
+                            aria-label={`Remove event ${event.note}`}
                             onClick={(e) => {
                               e.stopPropagation();
                               onRemoveEvent(event.id);
                             }}
-                            className="p-1 hover:bg-gray-600 rounded transition-colors"
+                            className="p-1 hover:bg-gray-600 rounded transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
                           >
-                            <X size={12} className="text-gray-400" />
+                            <X size={12} className="text-gray-400" aria-hidden="true" />
                           </button>
                         )}
                       </div>
@@ -352,4 +385,4 @@ export function IncidentTimeline({
       )}
     </div>
   );
-}
+});

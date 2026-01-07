@@ -1,7 +1,48 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { X, Keyboard } from 'lucide-react';
 
 export function KeyboardShortcutsHelp({ onClose }) {
+    const modalRef = useRef(null);
+
+    // Focus Trap Logic
+    useEffect(() => {
+        const modal = modalRef.current;
+        if (!modal) return;
+
+        const focusableElements = modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        // Focus the first element when modal opens
+        if (firstElement) {
+            firstElement.focus();
+        }
+
+        const handleTabKey = (e) => {
+            if (e.key === 'Tab') {
+                if (e.shiftKey) {
+                    if (document.activeElement === firstElement) {
+                        e.preventDefault();
+                        lastElement.focus();
+                    }
+                } else {
+                    if (document.activeElement === lastElement) {
+                        e.preventDefault();
+                        firstElement.focus();
+                    }
+                }
+            }
+            if (e.key === 'Escape') {
+                onClose();
+            }
+        };
+
+        modal.addEventListener('keydown', handleTabKey);
+        return () => modal.removeEventListener('keydown', handleTabKey);
+    }, [onClose]);
+
     const shortcuts = [
         {
             category: 'Playback',
@@ -46,19 +87,23 @@ export function KeyboardShortcutsHelp({ onClose }) {
     ];
 
     return (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-            <div className="bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-auto">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+            <div
+                ref={modalRef}
+                className="bg-gray-800 rounded-lg shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-auto focus:outline-none"
+            >
                 {/* Header */}
                 <div className="sticky top-0 bg-gray-900 p-4 border-b border-gray-700 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <Keyboard size={24} className="text-blue-400" />
-                        <h2 className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
+                        <Keyboard size={24} className="text-blue-400" aria-hidden="true" />
+                        <h2 id="shortcuts-title" className="text-xl font-bold text-white">Keyboard Shortcuts</h2>
                     </div>
                     <button
                         onClick={onClose}
+                        aria-label="Close shortcuts help"
                         className="p-2 hover:bg-gray-700 rounded transition-colors"
                     >
-                        <X size={20} className="text-gray-400" />
+                        <X size={20} className="text-gray-400" aria-hidden="true" />
                     </button>
                 </div>
 
@@ -76,7 +121,7 @@ export function KeyboardShortcutsHelp({ onClose }) {
                                         className="flex items-center justify-between py-2 px-3 bg-gray-900/50 rounded hover:bg-gray-900 transition-colors"
                                     >
                                         <span className="text-sm text-gray-300">{item.description}</span>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-1" aria-hidden="true">
                                             {item.keys.map((key, keyIdx) => (
                                                 <React.Fragment key={keyIdx}>
                                                     {keyIdx > 0 && (
