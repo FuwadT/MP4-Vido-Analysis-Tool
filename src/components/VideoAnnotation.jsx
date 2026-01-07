@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { CanvasOverlay } from './CanvasOverlay';
 import { Controls } from './Controls';
+import { IncidentTimeline } from './IncidentTimeline';
+import { AutoSaveIndicator } from './AutoSaveIndicator';
+import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { SimpleTracker } from '../utils/tracker';
@@ -34,6 +37,20 @@ export function VideoAnnotation() {
 
     // Settings
     const [minConfidence, setMinConfidence] = useState(0.5);
+
+    // Incident Timeline State
+    const [events, setEvents] = useState([]);
+    const [playbackSpeed, setPlaybackSpeed] = useState(1);
+
+    // Incident Metadata State
+    const [metadata, setMetadata] = useState({});
+
+    // Auto-save State
+    const [lastSaved, setLastSaved] = useState(null);
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Keyboard Shortcuts State
+    const [showShortcutsHelp, setShowShortcutsHelp] = useState(false);
 
     const videoRef = useRef(null);
     const containerRef = useRef(null);
@@ -253,6 +270,240 @@ export function VideoAnnotation() {
                 videoRef.current.play();
             }
             setIsPlaying(!isPlaying);
+        }
+    };
+
+    // Event Management
+    const handleAddEvent = (event) => {
+        setEvents(prev => [...prev, event]);
+    };
+
+    const handleRemoveEvent = (eventId) => {
+        setEvents(prev => prev.filter(e => e.id !== eventId));
+    };
+
+    const handleUpdateEvent = (eventId, updates) => {
+        setEvents(prev => prev.map(e => e.id === eventId ? { ...e, ...updates } : e));
+    };
+
+    // Playback Speed Control
+    const handlePlaybackSpeedChange = (speed) => {
+        setPlaybackSpeed(speed);
+        if (videoRef.current) {
+            videoRef.current.playbackRate = speed;
+        }
+    };
+
+    // Keyboard Shortcuts Handler
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            // Ignore shortcuts when typing in inputs/textareas
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            // Prevent default for handled shortcuts
+            const preventDefault = () => e.preventDefault();
+
+            switch (e.key) {
+                case ' ': // Space - Play/Pause
+                    preventDefault();
+                    togglePlay();
+                    break;
+
+                case 'ArrowRight': // Right arrow - Forward
+                    preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                        // Ctrl+Right - Next event
+                        const nextEvent = events.find(ev => ev.time > currentTime + 0.1);
+                        if (nextEvent) handleSeek(nextEvent.time);
+                    } else if (e.shiftKey) {
+                        // Shift+Right - Forward 1 second
+                        handleSeek(Math.min(currentTime + 1, duration));
+                    } else {
+                        // Right - Forward 0.1 second (1 frame)
+                        handleSeek(Math.min(currentTime + 0.1, duration));
+                    }
+                    break;
+
+                case 'ArrowLeft': // Left arrow - Backward
+                    preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                        // Ctrl+Left - Previous event
+                        const prevEvents = events.filter(ev => ev.time < currentTime - 0.1);
+                        const prevEvent = prevEvents[prevEvents.length - 1];
+                        if (prevEvent) handleSeek(prevEvent.time);
+                    } else if (e.shiftKey) {
+                        // Shift+Left - Backward 1 second
+                        handleSeek(Math.max(currentTime - 1, 0));
+                    } else {
+                        // Left - Backward 0.1 second (1 frame)
+                        handleSeek(Math.max(currentTime - 0.1, 0));
+                    }
+                    break;
+
+                case 'Home': // Jump to start
+                    preventDefault();
+                    handleSeek(0);
+                    break;
+
+                case 'End': // Jump to end
+                    preventDefault();
+                    handleSeek(duration);
+                    break;
+
+                case '+': // Increase speed
+                case '=': // Also handle = key (same key as +)
+                    preventDefault();
+                    const newSpeedUp = Math.min(playbackSpeed * 1.25, 2);
+                    handlePlaybackSpeedChange(newSpeedUp);
+                    break;
+
+                case '-': // Decrease speed
+                case '_': // Also handle _ key (same key as -)
+                    preventDefault();
+                    const newSpeedDown = Math.max(playbackSpeed * 0.8, 0.25);
+                    handlePlaybackSpeedChange(newSpeedDown);
+                    break;
+
+                case '0': // Reset to 1x speed
+                    preventDefault();
+                    handlePlaybackSpeedChange(1);
+                    break;
+
+                case 'm': // Add marker
+                case 'M':
+                    preventDefault();
+                    // Trigger add event UI
+                    // This will be handled by IncidentTimeline component
+                    break;
+
+                case '1': // Quick add: Collision
+                case '2': // Quick add: Near Miss
+                case '3': // Quick add: Hard Brake
+                case '4': // Quick add: Detection
+                case '5': // Quick add: Pedestrian
+                case '6': // Quick add: System Event
+                case '7': // Quick add: Custom
+                    preventDefault();
+                    const eventTypes = ['COLLISION', 'NEAR_MISS', 'HARD_BRAKE', 'DETECTION', 'PEDESTRIAN', 'SYSTEM_EVENT', 'CUSTOM'];
+                    const typeIndex = parseInt(e.key) - 1;
+                    if (typeIndex >= 0 && typeIndex < eventTypes.length) {
+                        const eventType = eventTypes[typeIndex];
+                        const EVENT_LABELS = {
+                            COLLISION: 'Collision',
+                            NEAR_MISS: 'Near Miss',
+                            HARD_BRAKE: 'Hard Brake',
+                            DETECTION: 'Object Detection',
+                            PEDESTRIAN: 'Pedestrian',
+                            SYSTEM_EVENT: 'System Event',
+                            CUSTOM: 'Custom'
+                        };
+                        handleAddEvent({
+                            id: Date.now(),
+                            type: eventType,
+                            time: currentTime,
+                            note: EVENT_LABELS[eventType],
+                            severity: eventType === 'COLLISION' ? 'critical' : eventType === 'NEAR_MISS' || eventType === 'HARD_BRAKE' || eventType === 'PEDESTRIAN' ? 'warning' : 'info'
+                        });
+                    }
+                    break;
+
+                case 's': // Ctrl+S - Save metadata
+                case 'S':
+                    if (e.ctrlKey || e.metaKey) {
+                        preventDefault();
+                        handleMetadataSave(metadata);
+                    }
+                    break;
+
+                case 'e': // Ctrl+E - Export report
+                case 'E':
+                    if (e.ctrlKey || e.metaKey) {
+                        preventDefault();
+                        handleExportReport();
+                    }
+                    break;
+
+                case '?': // Show shortcuts help
+                    preventDefault();
+                    setShowShortcutsHelp(true);
+                    break;
+
+                default:
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [currentTime, duration, isPlaying, playbackSpeed, events, metadata]);
+
+    // Apply playback speed when video loads
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.playbackRate = playbackSpeed;
+        }
+    }, [videoSrc, playbackSpeed]);
+
+    // Metadata Management
+    const handleMetadataUpdate = (updatedMetadata) => {
+        setMetadata(updatedMetadata);
+    };
+
+    const handleMetadataSave = (metadataToSave) => {
+        setMetadata(metadataToSave);
+        // Could also trigger auto-save to localStorage or backend here
+        console.log('Metadata saved:', metadataToSave);
+    };
+
+    // Auto-save effect
+    useEffect(() => {
+        const autoSaveInterval = setInterval(() => {
+            if (metadata && Object.keys(metadata).length > 0) {
+                setIsSaving(true);
+                // Save to localStorage as backup
+                try {
+                    localStorage.setItem('incident_metadata_autosave', JSON.stringify({
+                        metadata,
+                        events,
+                        timestamp: new Date().toISOString()
+                    }));
+                    setLastSaved(new Date());
+                } catch (e) {
+                    console.error('Auto-save failed:', e);
+                }
+                setTimeout(() => setIsSaving(false), 500);
+            }
+        }, 30000); // Every 30 seconds
+
+        return () => clearInterval(autoSaveInterval);
+    }, [metadata, events]);
+
+    const handleExportReport = () => {
+        // Generate comprehensive incident report
+        const report = {
+            metadata,
+            events,
+            tracks: uniqueTracks,
+            analysisResults: analysisResults.length > 0 ? {
+                totalFrames: analysisResults.length,
+                startTime: analysisStart,
+                endTime: analysisEnd || duration
+            } : null,
+            exportedAt: new Date().toISOString()
+        };
+
+        try {
+            const dataStr = JSON.stringify(report, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `incident_report_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Failed to export report:', e);
+            alert('Failed to export report');
         }
     };
 
@@ -488,6 +739,13 @@ export function VideoAnnotation() {
                 cursor-pointer
               "
                         />
+                        <button
+                            onClick={() => setShowShortcutsHelp(true)}
+                            className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm text-white transition-colors flex items-center gap-2 mx-auto"
+                        >
+                            <span className="font-mono">⌨️</span>
+                            View Keyboard Shortcuts (Press ?)
+                        </button>
                     </div>
                 ) : (
                     <div className="w-full max-w-4xl flex flex-col gap-4">
@@ -616,7 +874,19 @@ export function VideoAnnotation() {
                             )}
                         </div>
 
-                        <div className="w-full">
+                        <div className="w-full space-y-3">
+                            <IncidentTimeline
+                                currentTime={currentTime}
+                                duration={duration}
+                                onSeek={handleSeek}
+                                events={events}
+                                onAddEvent={handleAddEvent}
+                                onRemoveEvent={handleRemoveEvent}
+                                onUpdateEvent={handleUpdateEvent}
+                                tracks={uniqueTracks}
+                                playbackSpeed={playbackSpeed}
+                                onPlaybackSpeedChange={handlePlaybackSpeedChange}
+                            />
                             <Controls
                                 isPlaying={isPlaying}
                                 onTogglePlay={togglePlay}
@@ -636,7 +906,18 @@ export function VideoAnnotation() {
                 onRename={(track) => renameTrack(track.id, track.class)}
                 onSeek={handleSeek}
                 currentTime={currentTime}
+                metadata={metadata}
+                onMetadataUpdate={handleMetadataUpdate}
+                onMetadataSave={handleMetadataSave}
+                onExportReport={handleExportReport}
+                isSaving={isSaving}
+                lastSaved={lastSaved}
             />
+
+            {/* Keyboard Shortcuts Help Modal */}
+            {showShortcutsHelp && (
+                <KeyboardShortcutsHelp onClose={() => setShowShortcutsHelp(false)} />
+            )}
         </div>
     );
 }
