@@ -1,0 +1,10 @@
+.git
+.github
+.playwright-cli
+data
+dist
+node_modules
+output
+sample-waymo-e2e.tfrecord-00000-of-00266
+sample.mp4
+*.log

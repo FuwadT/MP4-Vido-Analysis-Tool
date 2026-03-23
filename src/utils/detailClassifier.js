@@ -2,6 +2,17 @@ import * as mobilenet from '@tensorflow-models/mobilenet';
 
 // Singleton model instance
 let classifierModel = null;
+let classifierCanvas = null;
+
+function getClassifierCanvas() {
+    if (!classifierCanvas) {
+        classifierCanvas = document.createElement('canvas');
+        classifierCanvas.width = 224;
+        classifierCanvas.height = 224;
+    }
+
+    return classifierCanvas;
+}
 
 export async function loadClassifier() {
     if (!classifierModel) {
@@ -19,7 +30,9 @@ export async function loadClassifier() {
  * @returns {Promise<string|null>} Top class name or null
  */
 export async function getDetailedClass(video, bbox) {
-    if (!classifierModel) return null;
+    if (!classifierModel) {
+        await loadClassifier();
+    }
 
     const [x, y, w, h] = bbox;
 
@@ -27,11 +40,14 @@ export async function getDetailedClass(video, bbox) {
     if (w < 20 || h < 20) return null;
 
     try {
-        // Create a temp canvas to crop the image
-        const canvas = document.createElement('canvas');
-        canvas.width = 224; // MobileNet native resolution preference
-        canvas.height = 224;
+        const canvas = getClassifierCanvas();
         const ctx = canvas.getContext('2d');
+
+        if (!ctx) {
+            return null;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         // Draw matched crop scaled to 224x224
         ctx.drawImage(video, x, y, w, h, 0, 0, 224, 224);

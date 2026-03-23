@@ -2,10 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  color-scheme: dark;
+  font-family: 'Aptos', 'Space Grotesk', 'Segoe UI Variable Text', 'IBM Plex Sans', sans-serif;
+  --studio-bg: #020617;
+  --studio-panel: rgba(2, 6, 23, 0.78);
+  --studio-grid: rgba(148, 163, 184, 0.06);
+  --studio-brand: #10b981;
+  --studio-brand-soft: rgba(16, 185, 129, 0.14);
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
 body {
-  background-color: #111827;
-  /* gray-900 */
-  color: white;
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top left, rgba(16, 185, 129, 0.18), transparent 24%),
+    radial-gradient(circle at top right, rgba(14, 165, 233, 0.16), transparent 26%),
+    linear-gradient(180deg, #020617 0%, #020617 35%, #0b1120 100%);
+  color: #f8fafc;
+  background-attachment: fixed;
+}
+
+#root {
+  position: relative;
+}
+
+#root::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--studio-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--studio-grid) 1px, transparent 1px);
+  background-size: 72px 72px;
+  mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.4), transparent 82%);
+  opacity: 0.35;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: rgba(16, 185, 129, 0.22);
+  color: #f8fafc;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.8);
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  border: 3px solid rgba(15, 23, 42, 0.8);
+  background: rgba(100, 116, 139, 0.65);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.7);
 }
 
 @keyframes scan {

@@ -1,8 +1,9 @@
 import React, { useState, useMemo, memo } from 'react';
-import { Search, Filter, ArrowUpDown, Clock, Activity, Target, FileText } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, Clock, Activity, Target, FileText, Shield } from 'lucide-react';
 import { MetadataPanel } from './MetadataPanel';
+import { ADASPanel } from './ADASPanel';
 
-export const TrackSidebar = memo(function TrackSidebar({ tracks, onRename, onSeek, metadata, onMetadataUpdate, onMetadataSave, onExportReport, isSaving, lastSaved }) {
+export const TrackSidebar = memo(function TrackSidebar({ tracks, onRename, onSeek, metadata, onMetadataUpdate, onMetadataSave, onExportReport, isSaving, lastSaved, events }) {
     const [searchQuery, setSearchQuery] = useState('');
     const [sortBy, setSortBy] = useState('id'); // 'id', 'time', 'conf', 'class'
     const [filterClass, setFilterClass] = useState('All');
@@ -76,6 +77,19 @@ export const TrackSidebar = memo(function TrackSidebar({ tracks, onRename, onSee
                     >
                         <FileText className="w-4 h-4" aria-hidden="true" />
                         Metadata
+                    </button>
+                    <button
+                        role="tab"
+                        aria-selected={activeTab === 'adas'}
+                        aria-label="ADAS Tab"
+                        onClick={() => setActiveTab('adas')}
+                        className={`flex-1 px-4 py-3 text-sm font-bold flex items-center justify-center gap-2 transition-colors ${activeTab === 'adas'
+                            ? 'bg-gray-900 text-white border-b-2 border-orange-500'
+                            : 'text-gray-400 hover:text-white hover:bg-gray-750'
+                            }`}
+                    >
+                        <Shield className="w-4 h-4" aria-hidden="true" />
+                        ADAS
                     </button>
                 </div>
             </div>
@@ -189,7 +203,7 @@ export const TrackSidebar = memo(function TrackSidebar({ tracks, onRename, onSee
                         )}
                     </div>
                 </>
-            ) : (
+            ) : activeTab === 'metadata' ? (
                 <div className="flex-1 overflow-y-auto p-3">
                     <MetadataPanel
                         metadata={metadata}
@@ -200,6 +214,8 @@ export const TrackSidebar = memo(function TrackSidebar({ tracks, onRename, onSee
                         lastSaved={lastSaved}
                     />
                 </div>
+            ) : (
+                <ADASPanel events={events || []} onSeek={onSeek} />
             )}
         </div>
     );

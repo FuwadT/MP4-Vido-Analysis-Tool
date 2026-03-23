@@ -7,12 +7,17 @@ import { KeyboardShortcutsHelp } from './KeyboardShortcutsHelp';
 import * as tf from '@tensorflow/tfjs';
 import * as cocoSsd from '@tensorflow-models/coco-ssd';
 import { SimpleTracker } from '../utils/tracker';
-import { loadClassifier, getDetailedClass } from '../utils/detailClassifier';
+import { getDetailedClass } from '../utils/detailClassifier';
 import { mapCocoToSchema, refineSchemaTag } from '../utils/schemaMapper';
+import { detectADASEvents, getTrafficLightStates, resetADASDetector } from '../utils/adasEventDetector';
 import { TrackSidebar } from './TrackSidebar';
 import yaml from 'js-yaml';
 
-export function VideoAnnotation() {
+const LIVE_DETECTION_INTERVAL_MS = 140;
+const MAX_DETAIL_REFINEMENTS_PER_FRAME = 2;
+const DETAIL_REFINEMENT_CLASSES = ['Vehicle', 'Truck', 'Motorcycle', 'Scooter'];
+
+export function VideoAnnotation({ embedded = false }) {
     const [videoSrc, setVideoSrc] = useState(null);
     const [currentTime, setCurrentTime] = useState(0);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -41,6 +46,9 @@ export function VideoAnnotation() {
     const [events, setEvents] = useState([]);
     const [playbackSpeed, setPlaybackSpeed] = useState(1);
 
+    // ADAS State
+    const [trafficLightStates, setTrafficLightStates] = useState([]);
+
     // Incident Metadata State
     const [metadata, setMetadata] = useState({});
 
@@ -54,6 +62,8 @@ export function VideoAnnotation() {
     const videoRef = useRef(null);
     const containerRef = useRef(null);
     const requestRef = useRef();
+    const lastLiveDetectionAtRef = useRef(0);
+    const liveDetectionInFlightRef = useRef(false);
 
     // Tracker reference - persist across renders
     const trackerRef = useRef(new SimpleTracker());
@@ -72,10 +82,7 @@ export function VideoAnnotation() {
             setIsModelLoading(true);
             try {
                 await tf.ready();
-                const [loadedCoco] = await Promise.all([
-                    cocoSsd.load(),
-                    loadClassifier()
-                ]);
+                const loadedCoco = await cocoSsd.load();
                 setModel(loadedCoco);
                 console.log('Models loaded');
             } catch (err) {
@@ -98,6 +105,7 @@ export function VideoAnnotation() {
             setAnalysisResults([]);
             setAnalysisStart(0);
             setAnalysisEnd(null); // Reset end time
+            lastLiveDetectionAtRef.current = 0;
             trackerRef.current.reset();
         }
     };
@@ -110,12 +118,13 @@ export function VideoAnnotation() {
         // If we have analysis results, use them instead of live detection
         if (analysisMode === 'done' || (analysisMode === 'idle' && analysisResults.length > 0)) {
             // Find nearest frame
-            // Simple approach: find first frame where timestamp >= currentTime - epsilon
             const frame = analysisResults.find(f => Math.abs(f.timestamp - time) < 0.2);
             if (frame) {
                 setPredictions(frame.predictions);
+                setTrafficLightStates(frame.trafficLights || []);
             } else {
                 setPredictions([]);
+                setTrafficLightStates([]);
             }
         }
     };
@@ -128,7 +137,9 @@ export function VideoAnnotation() {
         setIsAnalysisPaused(false);
         setAnalysisResults([]);
         setPredictions([]);
+        setTrafficLightStates([]);
         trackerRef.current.reset();
+        resetADASDetector();
 
         const video = videoRef.current;
         const duration = video.duration;
@@ -191,28 +202,52 @@ export function VideoAnnotation() {
             const tracks = trackerRef.current.update(validPreds, t);
 
             // Post-Process: Detailed Classification (Stage 2)
-            for (let track of tracks) {
-                // Optimization: Only run mobilenet if we haven't already refined it to a specific leaf node
-                const needsRefinement = ['Vehicle', 'Truck', 'Motorcycle', 'Scooter'].includes(track.class) && track.score > 0.6;
-                const hasNotBenRefined = !track.finalizedSchema;
+            const refinableTracks = tracks
+                .filter((track) => (
+                    DETAIL_REFINEMENT_CLASSES.includes(track.class)
+                    && track.score > 0.6
+                    && !track.finalizedSchema
+                    && ((track.lastDetailAttemptAt == null) || (t - track.lastDetailAttemptAt >= 1))
+                ))
+                .sort((left, right) => Number(right.score || 0) - Number(left.score || 0))
+                .slice(0, MAX_DETAIL_REFINEMENTS_PER_FRAME);
 
-                if (needsRefinement && hasNotBenRefined) {
-                    const detail = await getDetailedClass(video, track.bbox);
-                    if (detail) {
-                        const refinedTag = refineSchemaTag(track.class, detail);
-                        if (refinedTag !== track.class) {
-                            track.class = refinedTag;
-                        }
-                        track.finalizedSchema = true;
+            for (const track of refinableTracks) {
+                track.lastDetailAttemptAt = t;
+                const detail = await getDetailedClass(video, track.bbox);
+                if (detail) {
+                    const refinedTag = refineSchemaTag(track.class, detail);
+                    if (refinedTag !== track.class) {
+                        track.class = refinedTag;
                     }
+                    track.finalizedSchema = true;
                 }
+            }
+
+            // ADAS: Traffic Light Analysis
+            const tlStates = getTrafficLightStates(rawPreds, video);
+            setTrafficLightStates(tlStates);
+
+            // ADAS: Automatic Event Detection
+            const adasEvents = detectADASEvents({
+                tracks,
+                rawPredictions: rawPreds,
+                timestamp: t,
+                video,
+                frameWidth: video.videoWidth,
+                frameHeight: video.videoHeight
+            });
+
+            if (adasEvents.length > 0) {
+                setEvents(prev => [...prev, ...adasEvents]);
             }
 
             // Store (deep copy tracks to avoid reference issues)
             const tracksCopy = JSON.parse(JSON.stringify(tracks));
             results.push({
                 timestamp: t,
-                predictions: tracksCopy
+                predictions: tracksCopy,
+                trafficLights: tlStates
             });
 
             // Update UI occasionally
@@ -293,154 +328,34 @@ export function VideoAnnotation() {
         }
     }, []);
 
-    // Keyboard Shortcuts Handler
-    useEffect(() => {
-        const handleKeyPress = (e) => {
-            // Ignore shortcuts when typing in inputs/textareas
-            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-
-            // Prevent default for handled shortcuts
-            const preventDefault = () => e.preventDefault();
-
-            switch (e.key) {
-                case ' ': // Space - Play/Pause
-                    preventDefault();
-                    togglePlay();
-                    break;
-
-                case 'ArrowRight': // Right arrow - Forward
-                    preventDefault();
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl+Right - Next event
-                        const nextEvent = events.find(ev => ev.time > currentTime + 0.1);
-                        if (nextEvent) handleSeek(nextEvent.time);
-                    } else if (e.shiftKey) {
-                        // Shift+Right - Forward 1 second
-                        handleSeek(Math.min(currentTime + 1, duration));
-                    } else {
-                        // Right - Forward 0.1 second (1 frame)
-                        handleSeek(Math.min(currentTime + 0.1, duration));
-                    }
-                    break;
-
-                case 'ArrowLeft': // Left arrow - Backward
-                    preventDefault();
-                    if (e.ctrlKey || e.metaKey) {
-                        // Ctrl+Left - Previous event
-                        const prevEvents = events.filter(ev => ev.time < currentTime - 0.1);
-                        const prevEvent = prevEvents[prevEvents.length - 1];
-                        if (prevEvent) handleSeek(prevEvent.time);
-                    } else if (e.shiftKey) {
-                        // Shift+Left - Backward 1 second
-                        handleSeek(Math.max(currentTime - 1, 0));
-                    } else {
-                        // Left - Backward 0.1 second (1 frame)
-                        handleSeek(Math.max(currentTime - 0.1, 0));
-                    }
-                    break;
-
-                case 'Home': // Jump to start
-                    preventDefault();
-                    handleSeek(0);
-                    break;
-
-                case 'End': // Jump to end
-                    preventDefault();
-                    handleSeek(duration);
-                    break;
-
-                case '+': // Increase speed
-                case '=': // Also handle = key (same key as +)
-                    preventDefault();
-                    {
-                        const newSpeedUp = Math.min(playbackSpeed * 1.25, 2);
-                        handlePlaybackSpeedChange(newSpeedUp);
-                    }
-                    break;
-
-                case '-': // Decrease speed
-                case '_': // Also handle _ key (same key as -)
-                    preventDefault();
-                    {
-                        const newSpeedDown = Math.max(playbackSpeed * 0.8, 0.25);
-                        handlePlaybackSpeedChange(newSpeedDown);
-                    }
-                    break;
-
-                case '0': // Reset to 1x speed
-                    preventDefault();
-                    handlePlaybackSpeedChange(1);
-                    break;
-
-                case 'm': // Add marker
-                case 'M':
-                    preventDefault();
-                    // Trigger add event UI
-                    // This will be handled by IncidentTimeline component
-                    break;
-
-                case '1': // Quick add: Collision
-                case '2': // Quick add: Near Miss
-                case '3': // Quick add: Hard Brake
-                case '4': // Quick add: Detection
-                case '5': // Quick add: Pedestrian
-                case '6': // Quick add: System Event
-                case '7': // Quick add: Custom
-                    {
-                        preventDefault();
-                        const eventTypes = ['COLLISION', 'NEAR_MISS', 'HARD_BRAKE', 'DETECTION', 'PEDESTRIAN', 'SYSTEM_EVENT', 'CUSTOM'];
-                        const typeIndex = parseInt(e.key) - 1;
-                        if (typeIndex >= 0 && typeIndex < eventTypes.length) {
-                            const eventType = eventTypes[typeIndex];
-                            const EVENT_LABELS = {
-                                COLLISION: 'Collision',
-                                NEAR_MISS: 'Near Miss',
-                                HARD_BRAKE: 'Hard Brake',
-                                DETECTION: 'Object Detection',
-                                PEDESTRIAN: 'Pedestrian',
-                                SYSTEM_EVENT: 'System Event',
-                                CUSTOM: 'Custom'
-                            };
-                            handleAddEvent({
-                                id: Date.now(),
-                                type: eventType,
-                                time: currentTime,
-                                note: EVENT_LABELS[eventType],
-                                severity: eventType === 'COLLISION' ? 'critical' : eventType === 'NEAR_MISS' || eventType === 'HARD_BRAKE' || eventType === 'PEDESTRIAN' ? 'warning' : 'info'
-                            });
-                        }
-                    }
-                    break;
-
-                case 's': // Ctrl+S - Save metadata
-                case 'S':
-                    if (e.ctrlKey || e.metaKey) {
-                        preventDefault();
-                        handleMetadataSave(metadata);
-                    }
-                    break;
-
-                case 'e': // Ctrl+E - Export report
-                case 'E':
-                    if (e.ctrlKey || e.metaKey) {
-                        preventDefault();
-                        handleExportReport();
-                    }
-                    break;
-
-                case '?': // Show shortcuts help
-                    preventDefault();
-                    setShowShortcutsHelp(true);
-                    break;
-
-                default:
-                    break;
-            }
+    const handleExportReport = useCallback(() => {
+        // Generate comprehensive incident report
+        const report = {
+            metadata,
+            events,
+            tracks: uniqueTracks,
+            analysisResults: analysisResults.length > 0 ? {
+                totalFrames: analysisResults.length,
+                startTime: analysisStart,
+                endTime: analysisEnd || duration
+            } : null,
+            exportedAt: new Date().toISOString()
         };
 
-        window.addEventListener('keydown', handleKeyPress);
-        return () => window.removeEventListener('keydown', handleKeyPress);
-    }, [currentTime, duration, isPlaying, playbackSpeed, events, metadata, handleAddEvent, handleExportReport, handleMetadataSave, handleSeek, togglePlay, handlePlaybackSpeedChange]);
+        try {
+            const dataStr = JSON.stringify(report, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `incident_report_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Failed to export report:', e);
+            alert('Failed to export report');
+        }
+    }, [metadata, events, uniqueTracks, analysisResults, analysisStart, analysisEnd, duration]);
 
     // Apply playback speed when video loads
     useEffect(() => {
@@ -483,35 +398,6 @@ export function VideoAnnotation() {
         return () => clearInterval(autoSaveInterval);
     }, [metadata, events]);
 
-    const handleExportReport = useCallback(() => {
-        // Generate comprehensive incident report
-        const report = {
-            metadata,
-            events,
-            tracks: uniqueTracks,
-            analysisResults: analysisResults.length > 0 ? {
-                totalFrames: analysisResults.length,
-                startTime: analysisStart,
-                endTime: analysisEnd || duration
-            } : null,
-            exportedAt: new Date().toISOString()
-        };
-
-        try {
-            const dataStr = JSON.stringify(report, null, 2);
-            const blob = new Blob([dataStr], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `incident_report_${new Date().toISOString().split('T')[0]}.json`;
-            a.click();
-            URL.revokeObjectURL(url);
-        } catch (e) {
-            console.error('Failed to export report:', e);
-            alert('Failed to export report');
-        }
-    }, [metadata, events, uniqueTracks, analysisResults, analysisStart, analysisEnd, duration]);
-
     const handleSeek = useCallback((time) => {
         if (videoRef.current) {
             videoRef.current.currentTime = time;
@@ -523,55 +409,216 @@ export function VideoAnnotation() {
                 const frame = analysisResults.find(f => Math.abs(f.timestamp - time) < 0.2);
                 if (frame) {
                     setPredictions(frame.predictions);
+                    setTrafficLightStates(frame.trafficLights || []);
                 }
             } else {
                 setPredictions([]);
+                setTrafficLightStates([]);
                 trackerRef.current.reset();
             }
         }
     }, [analysisMode, analysisResults]);
 
+    // Keyboard shortcuts depend on the handlers above, so keep this effect below them.
+    useEffect(() => {
+        const handleKeyPress = (e) => {
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+            const preventDefault = () => e.preventDefault();
+
+            switch (e.key) {
+                case ' ':
+                    preventDefault();
+                    togglePlay();
+                    break;
+
+                case 'ArrowRight':
+                    preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                        const nextEvent = events.find(ev => ev.time > currentTime + 0.1);
+                        if (nextEvent) handleSeek(nextEvent.time);
+                    } else if (e.shiftKey) {
+                        handleSeek(Math.min(currentTime + 1, duration));
+                    } else {
+                        handleSeek(Math.min(currentTime + 0.1, duration));
+                    }
+                    break;
+
+                case 'ArrowLeft':
+                    preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                        const prevEvents = events.filter(ev => ev.time < currentTime - 0.1);
+                        const prevEvent = prevEvents[prevEvents.length - 1];
+                        if (prevEvent) handleSeek(prevEvent.time);
+                    } else if (e.shiftKey) {
+                        handleSeek(Math.max(currentTime - 1, 0));
+                    } else {
+                        handleSeek(Math.max(currentTime - 0.1, 0));
+                    }
+                    break;
+
+                case 'Home':
+                    preventDefault();
+                    handleSeek(0);
+                    break;
+
+                case 'End':
+                    preventDefault();
+                    handleSeek(duration);
+                    break;
+
+                case '+':
+                case '=': {
+                    preventDefault();
+                    const newSpeedUp = Math.min(playbackSpeed * 1.25, 2);
+                    handlePlaybackSpeedChange(newSpeedUp);
+                    break;
+                }
+
+                case '-':
+                case '_': {
+                    preventDefault();
+                    const newSpeedDown = Math.max(playbackSpeed * 0.8, 0.25);
+                    handlePlaybackSpeedChange(newSpeedDown);
+                    break;
+                }
+
+                case '0':
+                    preventDefault();
+                    handlePlaybackSpeedChange(1);
+                    break;
+
+                case 'm':
+                case 'M':
+                    preventDefault();
+                    break;
+
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7': {
+                    preventDefault();
+                    const eventTypes = ['COLLISION', 'NEAR_MISS', 'HARD_BRAKE', 'DETECTION', 'PEDESTRIAN', 'SYSTEM_EVENT', 'CUSTOM'];
+                    const typeIndex = parseInt(e.key, 10) - 1;
+                    if (typeIndex >= 0 && typeIndex < eventTypes.length) {
+                        const eventType = eventTypes[typeIndex];
+                        const EVENT_LABELS = {
+                            COLLISION: 'Collision',
+                            NEAR_MISS: 'Near Miss',
+                            HARD_BRAKE: 'Hard Brake',
+                            DETECTION: 'Object Detection',
+                            PEDESTRIAN: 'Pedestrian',
+                            SYSTEM_EVENT: 'System Event',
+                            CUSTOM: 'Custom'
+                        };
+                        handleAddEvent({
+                            id: Date.now(),
+                            type: eventType,
+                            time: currentTime,
+                            note: EVENT_LABELS[eventType],
+                            severity: eventType === 'COLLISION' ? 'critical' : eventType === 'NEAR_MISS' || eventType === 'HARD_BRAKE' || eventType === 'PEDESTRIAN' ? 'warning' : 'info'
+                        });
+                    }
+                    break;
+                }
+
+                case 's':
+                case 'S':
+                    if (e.ctrlKey || e.metaKey) {
+                        preventDefault();
+                        handleMetadataSave(metadata);
+                    }
+                    break;
+
+                case 'e':
+                case 'E':
+                    if (e.ctrlKey || e.metaKey) {
+                        preventDefault();
+                        handleExportReport();
+                    }
+                    break;
+
+                case '?':
+                    preventDefault();
+                    setShowShortcutsHelp(true);
+                    break;
+
+                default:
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyPress);
+        return () => window.removeEventListener('keydown', handleKeyPress);
+    }, [currentTime, duration, events, handleAddEvent, handleExportReport, handleMetadataSave, handlePlaybackSpeedChange, handleSeek, metadata, playbackSpeed, togglePlay]);
+
     // Live Detection Loop (Hybrid: Only run if NOT analyzed)
-    const detectFrame = useCallback(async () => {
+    const detectFrame = useCallback(async (frameTime = performance.now()) => {
         if (analysisMode === 'analyzing' || analysisMode === 'done') return; // Disable live if analyzing or done
 
-        if (videoRef.current && model && videoRef.current.readyState === 4) {
-            // 1. Detect
-            const rawPreds = await model.detect(videoRef.current);
-
-            // 2. Filter & Map (Schema Enforcement)
-            let validPreds = [];
-            for (let p of rawPreds) {
-                if (p.score < minConfidence) continue;
-                const mappedClass = mapCocoToSchema(p.class);
-                if (mappedClass) {
-                    validPreds.push({ ...p, class: mappedClass });
-                }
+        if (liveDetectionInFlightRef.current) {
+            if (isPlaying) {
+                requestRef.current = requestAnimationFrame(detectFrame);
             }
-
-            // 3. Update Tracker
-            const tracks = trackerRef.current.update(validPreds);
-            setPredictions(tracks); // Update state with TRACKS
-
-            // 4. Update stats - Schema already enforced by mapCocoToSchema
-            if (tracks.length > 0) {
-                setUniqueTracks(prev => {
-                    const newTracks = [...prev];
-                    tracks.forEach(t => {
-                        const existingIndex = newTracks.findIndex(ut => ut.id === t.id);
-                        if (existingIndex === -1) {
-                            newTracks.push({ id: t.id, class: t.class, color: t.color });
-                        } else if (newTracks[existingIndex].class !== t.class) {
-                            newTracks[existingIndex].class = t.class;
-                        }
-                    });
-                    return newTracks;
-                });
-            }
+            return;
         }
 
-        if (isPlaying) {
+        if (
+            isPlaying
+            && lastLiveDetectionAtRef.current > 0
+            && (frameTime - lastLiveDetectionAtRef.current) < LIVE_DETECTION_INTERVAL_MS
+        ) {
             requestRef.current = requestAnimationFrame(detectFrame);
+            return;
+        }
+
+        liveDetectionInFlightRef.current = true;
+
+        try {
+            if (videoRef.current && model && videoRef.current.readyState === 4) {
+                // 1. Detect
+                const rawPreds = await model.detect(videoRef.current);
+
+                // 2. Filter & Map (Schema Enforcement)
+                const validPreds = [];
+                for (const prediction of rawPreds) {
+                    if (prediction.score < minConfidence) continue;
+                    const mappedClass = mapCocoToSchema(prediction.class);
+                    if (mappedClass) {
+                        validPreds.push({ ...prediction, class: mappedClass });
+                    }
+                }
+
+                // 3. Update Tracker
+                const tracks = trackerRef.current.update(validPreds);
+                setPredictions(tracks);
+
+                // 4. Update stats - Schema already enforced by mapCocoToSchema
+                if (tracks.length > 0) {
+                    setUniqueTracks((prev) => {
+                        const newTracks = [...prev];
+                        tracks.forEach((track) => {
+                            const existingIndex = newTracks.findIndex((uniqueTrack) => uniqueTrack.id === track.id);
+                            if (existingIndex === -1) {
+                                newTracks.push({ id: track.id, class: track.class, color: track.color });
+                            } else if (newTracks[existingIndex].class !== track.class) {
+                                newTracks[existingIndex].class = track.class;
+                            }
+                        });
+                        return newTracks;
+                    });
+                }
+            }
+        } finally {
+            lastLiveDetectionAtRef.current = frameTime;
+            liveDetectionInFlightRef.current = false;
+
+            if (isPlaying) {
+                requestRef.current = requestAnimationFrame(detectFrame);
+            }
         }
     }, [analysisMode, model, minConfidence, isPlaying]);
 
@@ -720,11 +767,19 @@ export function VideoAnnotation() {
     // We'll accept that uniqueTags might contain past low-confidence items.
 
 
+    const outerContainerClass = embedded
+        ? 'h-full text-white'
+        : 'min-h-screen px-4 pb-4 pt-24 text-white';
+    const innerContainerClass = embedded
+        ? 'flex h-full min-h-[920px] w-full overflow-hidden rounded-[32px] border border-slate-800 bg-gray-900/95 shadow-[0_30px_80px_rgba(2,6,23,0.45)]'
+        : 'mx-auto flex min-h-[calc(100vh-7rem)] w-full max-w-[1880px] overflow-hidden rounded-[32px] border border-slate-800 bg-gray-900/95 shadow-[0_30px_80px_rgba(2,6,23,0.45)]';
+
     return (
-        <div className="flex h-screen bg-gray-900 text-white overflow-hidden">
-            <div className="flex-1 flex flex-col items-center justify-center p-4 relative">
+        <div className={outerContainerClass}>
+            <div className={innerContainerClass}>
+                <div className="relative flex flex-1 flex-col items-center justify-center p-4 md:p-6">
                 {!videoSrc ? (
-                    <div className="text-center p-10 border-2 border-dashed border-gray-700 rounded-lg">
+                    <div className="mx-auto w-full max-w-2xl rounded-[28px] border-2 border-dashed border-gray-700 bg-gray-950/40 p-10 text-center">
                         <h2 className="text-2xl font-bold mb-4">Upload Video to Auto-Analyze</h2>
                         {isModelLoading ? (
                             <div className="text-blue-400 animate-pulse">Loading AI Model...</div>
@@ -749,13 +804,13 @@ export function VideoAnnotation() {
                             onClick={() => setShowShortcutsHelp(true)}
                             className="mt-4 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded text-sm text-white transition-colors flex items-center gap-2 mx-auto"
                         >
-                            <span className="font-mono">⌨️</span>
+                            <span className="font-mono">KB</span>
                             View Keyboard Shortcuts (Press ?)
                         </button>
                     </div>
                 ) : (
-                    <div className="w-full max-w-4xl flex flex-col gap-4">
-                        <div className="flex justify-between items-center bg-gray-800 p-3 rounded">
+                    <div className="mx-auto flex w-full max-w-5xl flex-col gap-4">
+                        <div className="flex justify-between items-center rounded-2xl border border-gray-700 bg-gray-800/95 p-3">
                             <div className="flex items-center gap-4 w-full">
                                 <div className="flex flex-col gap-2 mb-0 w-full">
                                     {analysisMode !== 'analyzing' ? (
@@ -821,14 +876,14 @@ export function VideoAnnotation() {
                                 </div>
                                 {analysisMode === 'done' && (
                                     <div className="text-green-400 font-bold flex items-center gap-2 whitespace-nowrap">
-                                        ✓ Ready
+                                        Ready
                                         <button onClick={() => setAnalysisMode('idle')} className="text-xs text-gray-400 underline ml-2">Reset</button>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        <div ref={containerRef} className="relative shadow-2xl rounded-lg overflow-hidden max-h-[70vh] aspect-video bg-black group">
+                        <div ref={containerRef} className="relative aspect-video max-h-[70vh] overflow-hidden rounded-[28px] border border-gray-700 bg-black shadow-2xl group">
                             <video
                                 ref={videoRef}
                                 src={videoSrc}
@@ -844,6 +899,7 @@ export function VideoAnnotation() {
                                 videoWidth={videoRef.current?.videoWidth || 0}
                                 videoHeight={videoRef.current?.videoHeight || 0}
                                 predictions={displayPredictions}
+                                trafficLights={trafficLightStates}
                             />
 
                             {/* HUD LAYER */}
@@ -905,19 +961,21 @@ export function VideoAnnotation() {
                         </div>
                     </div>
                 )}
-            </div>
+                </div>
 
-            <TrackSidebar
-                tracks={uniqueTracks}
-                onRename={(track) => renameTrack(track.id, track.class)}
-                onSeek={handleSeek}
-                metadata={metadata}
-                onMetadataUpdate={handleMetadataUpdate}
-                onMetadataSave={handleMetadataSave}
-                onExportReport={handleExportReport}
-                isSaving={isSaving}
-                lastSaved={lastSaved}
-            />
+                <TrackSidebar
+                    tracks={uniqueTracks}
+                    onRename={(track) => renameTrack(track.id, track.class)}
+                    onSeek={handleSeek}
+                    metadata={metadata}
+                    onMetadataUpdate={handleMetadataUpdate}
+                    onMetadataSave={handleMetadataSave}
+                    onExportReport={handleExportReport}
+                    isSaving={isSaving}
+                    lastSaved={lastSaved}
+                    events={events}
+                />
+            </div>
 
             {/* Keyboard Shortcuts Help Modal */}
             {showShortcutsHelp && (

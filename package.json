@@ -6,20 +6,31 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "cloud:dev": "node server/index.mjs",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "test": "vitest run",
+    "preview": "vite preview",
+    "waymo:e2e:list": "node scripts/waymo-e2e-cli.mjs list",
+    "waymo:e2e:sample": "node scripts/waymo-e2e-cli.mjs sample"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.19.0",
     "@tensorflow-models/coco-ssd": "^2.2.3",
     "@tensorflow-models/mobilenet": "^2.1.1",
     "@tensorflow/tfjs": "^4.22.0",
     "clsx": "^2.1.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "fabric": "^6.9.1",
+    "hyparquet": "^1.25.1",
+    "hyparquet-compressors": "^1.1.1",
     "js-yaml": "^4.1.1",
     "lucide-react": "^0.561.0",
+    "protobufjs": "^8.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "tailwind-merge": "^3.4.0"
+    "tailwind-merge": "^3.4.0",
+    "three": "^0.180.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
@@ -33,6 +44,7 @@
     "globals": "^16.5.0",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vitest": "^4.0.18"
   }
 }

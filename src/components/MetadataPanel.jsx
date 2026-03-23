@@ -309,7 +309,7 @@ export const MetadataPanel = memo(function MetadataPanel({
                             </div>
 
                             <div>
-                                <label htmlFor="acceleration" className="text-xs text-gray-400 block mb-1">Acceleration (m/s²)</label>
+                                <label htmlFor="acceleration" className="text-xs text-gray-400 block mb-1">Acceleration (m/s^2)</label>
                                 <input
                                     id="acceleration"
                                     type="number"
@@ -321,7 +321,7 @@ export const MetadataPanel = memo(function MetadataPanel({
                             </div>
 
                             <div>
-                                <label htmlFor="steeringAngle" className="text-xs text-gray-400 block mb-1">Steering Angle (°)</label>
+                                <label htmlFor="steeringAngle" className="text-xs text-gray-400 block mb-1">Steering Angle (deg)</label>
                                 <input
                                     id="steeringAngle"
                                     type="number"

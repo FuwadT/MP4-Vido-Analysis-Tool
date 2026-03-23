@@ -28,3 +28,9 @@ dist/
 coverage/
 .npm-cache/
 sample.mp4
+data/waymo/
+data/cloud-manifests/
+data/studio/
+output/
+.playwright-cli/
+sample-waymo-e2e.tfrecord-00000-of-00266

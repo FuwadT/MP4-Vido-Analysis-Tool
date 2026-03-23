@@ -204,14 +204,14 @@ export const IncidentTimeline = memo(function IncidentTimeline({
               className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!events.some(e => e.time < currentTime - 0.1)}
             >
-              ← Previous Event
+                Previous Event &lt;
             </button>
             <button
               onClick={jumpToNextEvent}
               className="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={!events.some(e => e.time > currentTime + 0.1)}
             >
-              Next Event →
+                Next Event &gt;
             </button>
             <button
               onClick={jumpToFirstDetection}
